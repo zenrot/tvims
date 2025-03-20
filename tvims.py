@@ -105,9 +105,7 @@ def main():
         print(moment_centr(sample,1), "момент центральный 1")
         print(moment_centr(sample,10), "момент центральный 10")
 
-
-
-
+        print("aaa")
 
 
 if __name__ == '__main__':
