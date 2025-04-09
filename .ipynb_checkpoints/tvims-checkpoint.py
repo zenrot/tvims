@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import math
 import numpy as np
 from scipy.special import gammainc
-from scipy.stats import nakagami
 sum_all = 0
 sample_aver = 0
 
@@ -29,13 +28,11 @@ def moda_count(data):
     else:
         return mod_val
 def mediana_count(data):
-    data = sorted(data)
     n = len(data)
     if n%2==1:
         return data[n/2]
     else:
         return ((data[int(n/2-1)]) + (data[int(n/2+1)]))/2
-    
 def sum_count(data):
     s = 0
     for row in data:
@@ -156,7 +153,6 @@ def graph_histogram(data):
     Частоты вычисляются вручную с помощью compute_histogram,
     а затем построение происходит через plt.bar.
     """
-    n = len(data)
     freq, bins, bin_width = compute_histogram(data)
     m = int(1 + 3.332*math.log(len(data)))
     # Вычисляем центры интервалов для размещения столбцов
@@ -165,7 +161,7 @@ def graph_histogram(data):
     plt.bar(bin_centers, freq, width=bin_width, align='center', edgecolor='black', color='skyblue')
     plt.xlabel("Значение x")
     plt.ylabel("Частота")
-    plt.title(f"Гистограмма выборки из {n} элементов")
+    plt.title("Гистограмма выборки")
     plt.grid(True)
     plt.show()
 def theoretical_cdf_nakagami(x, nu, loc):
@@ -232,21 +228,15 @@ def plot_three_theoretical_cdfs_on_one(nu1, loc1, nu2, loc2, nu3, loc3):
     
     plt.figure(figsize=(8, 6))
     # Строим каждую кривую своим цветом
-    plt.figure(figsize=(10, 6))
-    plt.plot(x_values, y1, color='red', linewidth=2, 
-             label=f"Кривая 1: ν={nu1:.2f}, loc={loc1:.2f}")
-    plt.plot(x_values, y2, color='green', linewidth=2, 
-             label=f"Кривая 2: ν={nu2:.2f}, loc={loc2:.2f}")
-    plt.plot(x_values, y3, color='blue', linewidth=2, 
-             label=f"Кривая 3: ν={nu3:.2f}, loc={loc3:.2f}")
+    plt.plot(x_values, y1, color='red', linewidth=2, label=f"nu={nu1}, loc={loc1}")
+    plt.plot(x_values, y2, color='green', linewidth=2, label=f"nu={nu2}, loc={loc2}")
+    plt.plot(x_values, y3, color='blue', linewidth=2, label=f"nu={nu3}, loc={loc3}")
     
-    plt.xlabel("x", fontsize=12)
-    plt.ylabel("F(x)", fontsize=12)
-    plt.title("Теоретические функции распределения Накагами", fontsize=14)
-    plt.legend(loc='lower right', fontsize=10, framealpha=1)
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.xlim(x_min, x_max)
-    plt.ylim(-0.05, 1.05)
+    plt.xlabel("x")
+    plt.ylabel("F(x)")
+    plt.title("Теоретические функции распределения (Накагами) для разных параметров")
+    plt.legend()
+    plt.grid(True)
     plt.show()
 def main():
     with open('var_4_nakagami.csv', newline ='') as f:
@@ -288,20 +278,10 @@ def main():
         ecdf_10 = empirical_cdf(rand_sub_sample(sample,10))
         ecdf_100 = empirical_cdf(rand_sub_sample(sample,100))
         ecdf_200 = empirical_cdf(rand_sub_sample(sample,200))
-        # graph_ecdf(rand_sub_sample(sample,10))
         # graph_ecdf(rand_sub_sample(sample,100))
-        # graph_ecdf(rand_sub_sample(sample,200))
-        # graph_histogram(rand_sub_sample(sample, 10))
         # graph_histogram(rand_sub_sample(sample, 100))
-        # graph_histogram(rand_sub_sample(sample, 200))
-        plot_three_theoretical_cdfs_on_one(0.5,1,4,1,10,1)
-        plot_three_theoretical_cdfs_on_one(5,1,5,10,5,3)
-        # Данные (например, амплитуда сигнала)
-
-        # Оценка параметров
-        nu, loc, scale = nakagami.fit(sample, floc= sorted_sample[0])  # floc=0 фиксирует loc (сдвиг) на 0
-        print(f"Оценки: nu = {nu:.2f}, scale = {scale:.2f},loc = {loc:.2f}")
-        
+        # plot_theoretical_cdf(100,-5)
+        plot_three_theoretical_cdfs_on_one(1,1,1,10,1,20)
         
 
 if __name__ == '__main__':

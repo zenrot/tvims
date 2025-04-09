@@ -18,7 +18,12 @@
                 "-ffunction-sections",
                 "-fdata-sections",
                 "-pipe"
+            ],
+            "macFrameworkPath": [
+                "/System/Library/Frameworks",
+                "/Library/Frameworks"
             ]
         }
-    ]
+    ],
+    "version": 4
 }
