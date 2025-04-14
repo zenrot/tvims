@@ -234,11 +234,11 @@ def plot_three_theoretical_cdfs_on_one(nu1, loc1, nu2, loc2, nu3, loc3):
     # Строим каждую кривую своим цветом
     plt.figure(figsize=(10, 6))
     plt.plot(x_values, y1, color='red', linewidth=2, 
-             label=f"Кривая 1: ν={nu1:.2f}, loc={loc1:.2f}")
+             label=f"Кривая 1: μ={nu1:.2f}, loc={loc1:.2f}")
     plt.plot(x_values, y2, color='green', linewidth=2, 
-             label=f"Кривая 2: ν={nu2:.2f}, loc={loc2:.2f}")
+             label=f"Кривая 2: μ={nu2:.2f}, loc={loc2:.2f}")
     plt.plot(x_values, y3, color='blue', linewidth=2, 
-             label=f"Кривая 3: ν={nu3:.2f}, loc={loc3:.2f}")
+             label=f"Кривая 3: μ={nu3:.2f}, loc={loc3:.2f}")
     
     plt.xlabel("x", fontsize=12)
     plt.ylabel("F(x)", fontsize=12)
