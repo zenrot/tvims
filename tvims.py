@@ -12,35 +12,7 @@ sample_aver = 0
 
 sample = []
 
-def bootstrap_bias_mle(data, num_bootstrap_samples=10000):
-    mu_estimates = []
-    scale_estimates = []
-    loc_estimates = []
 
-    n = len(data)
-    for _ in range(num_bootstrap_samples):
-        bootstrap_sample = [random.choice(data) for _ in range(n)]
-        sorted_bootstrap = sorted(bootstrap_sample)
-        mu_hat, loc_hat, scale_hat = nakagami.fit(bootstrap_sample, floc=sorted_bootstrap[0], fscale=1)
-        mu_estimates.append(mu_hat)
-        loc_estimates.append(loc_hat)
-        scale_estimates.append(scale_hat)
-
-    # Средние значения оценок
-    mean_mu = np.mean(mu_estimates)
-    mean_loc = np.mean(loc_estimates)
-    mean_scale = np.mean(scale_estimates)
-
-    # Оригинальные оценки
-    sorted_data = sorted(data)
-    mu_original, loc_original, scale_original = nakagami.fit(data, floc=sorted_data[0])
-
-    # Смещения
-    bias_mu = mean_mu - mu_original
-    bias_loc = mean_loc - loc_original
-    bias_scale = mean_scale - scale_original
-
-    return bias_mu, bias_loc, bias_scale
 
 def method_of_moments_nakagami(data):
     """
@@ -433,12 +405,6 @@ def main():
         delta0 = np.min(sample) - 0.01
         mu_mle, delta_mle, iterations = newton_raphson_nakagami(sample, mu0, delta0)
         print(f"Оценки (MLE): mu = {mu_mle:.5f}, delta = {delta_mle:.5f}, итераций: {iterations}")
-
-        bias_mom = bootstrap_bias_mle(sample)
-        print("\nBootstrap-оценка смещения:")
-        print(f"Bias mu = {bias_mom[0]:.5f}")
-        print(f"Bias omega = {bias_mom[1]:.5f}")
-        print(f"Bias delta = {bias_mom[2]:.5f}")
         
 
 if __name__ == '__main__':
