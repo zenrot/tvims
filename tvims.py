@@ -1,3 +1,4 @@
+
 import csv
 import random
 import matplotlib.pyplot as plt
@@ -5,8 +6,9 @@ import math
 import numpy as np
 from scipy.special import gammainc
 from scipy.stats import nakagami
-from scipy.special import psi, polygamma
-
+from scipy.special import gamma
+from scipy.optimize import minimize
+from scipy.optimize import brentq
 sum_all = 0
 sample_aver = 0
 
@@ -14,90 +16,74 @@ sample = []
 
 
 
-def method_of_moments_nakagami(data):
-    """
-    Оценивает параметры распределения Накагами (mu, omega, delta) методом моментов.
-    
-    Параметры:
-    data - выборка данных
-    
-    Возвращает:
-    mu_hat, omega_hat, delta_hat - оценки параметров
-    """
-    n = len(data)
-    m1 = np.mean(data)
-    m2 = np.mean(np.square(data))
-    m3 = np.mean(np.power(data, 3))
-    
-    # Оценка delta (сдвига) через минимальное значение выборки
-    delta_hat = np.min(data) - 1e-6  # небольшая поправка для избежания нулей
-    
-    # Центрируем данные
-    y = data - delta_hat
-    
-    # Вычисляем моменты центрированных данных
-    mu1_y = np.mean(y)
-    mu2_y = np.mean(np.square(y))
-    
-    # Оценка параметра формы mu
-    mu_hat = (mu1_y**2) / (mu2_y - mu1_y**2)
-    
-    # Оценка параметра масштаба omega
-    omega_hat = mu2_y
-    
-    return mu_hat, omega_hat, delta_hat
-
-def newton_raphson_nakagami(data, mu0=2.0, delta0=0.0, max_iter=100, tol=1e-6):
-    n = len(data)
-    mu = mu0
-    delta = delta0
-
-    for i in range(max_iter):
-        # Центрируем выборку
-        y = data - delta
-
-        # Проверка: все y должны быть положительными
-        if np.any(y <= 0):
-            raise ValueError("При текущем delta некоторые y_i <= 0!")
-
-        log_y = np.log(y)
-        y2 = y**2
-
-        # Производные по mu
-        dig = psi(mu)
-        trig = polygamma(1, mu)
-
-        grad_mu = n * (math.log(mu) + 1 - dig) + 2 * np.sum(log_y) - np.sum(y2)
-        hess_mu = n * (1 / mu - trig)
-
-        # Производные по delta
-        grad_delta = 2 * mu * np.sum(y) - 2 * mu * n
-        hess_delta = 2 * mu * n
-
-        # Обновление параметров (независимо для простоты)
-        mu_new = mu - grad_mu / hess_mu
-        delta_new = delta - grad_delta / hess_delta
-
-        # Проверка на допустимость
-        if mu_new <= 0:
-            mu_new = 0.1  # минимально допустимое значение
-
-        if delta_new >= np.min(data):
-            delta_new = np.min(data) - 1e-6  # чтобы y > 0
-
-        # Проверка на сходимость
-        if abs(mu_new - mu) < tol and abs(delta_new - delta) < tol:
-            return mu_new, delta_new, i + 1
-
-        mu = mu_new
-        delta = delta_new
-
-    raise RuntimeError("Метод Ньютона–Рафсона не сошёлся за max_iter итераций")
-
-
-
 def rand_sub_sample(data, size):
     return random.sample(data,size)
+
+# Функция для вычисления выборочной дисперсии
+def sample_disp_count(data):
+    return np.var(data, ddof=0)
+
+# Функция для решения уравнения для mu методом бисекции
+def solve_mu(S2):
+    def eq_mu(mu):
+        # Вычисляем коэффициент r = Gamma(mu+0.5)^2 / (Gamma(mu)^2 * mu)
+        log_r = 2 * math.lgamma(mu + 0.5) - 2 * math.lgamma(mu) - math.log(mu)
+        r = math.exp(log_r)
+        return (1 - r) - S2  # Приравниваем к S2
+    
+    # Интервал для поиска mu
+    mu_lower = 0.5001  # Начальный нижний предел
+    mu_upper = 1e5     # Верхний предел
+    # Метод бисекции для нахождения корня
+    while mu_upper - mu_lower > 1e-5:  # Точность
+        mu_mid = (mu_lower + mu_upper) / 2
+        if eq_mu(mu_mid) > 0:
+            mu_lower = mu_mid
+        else:
+            mu_upper = mu_mid
+    
+    return (mu_lower + mu_upper) / 2
+
+# Функция для вычисления значения смещения (delta)
+def solve_delta(mu, barX):
+    log_delta_coeff = math.lgamma(mu + 0.5) - math.lgamma(mu) - 0.5 * math.log(mu)
+    return barX - math.exp(log_delta_coeff)
+
+# Основная функция для выполнения метода моментов
+def method_of_moments_nakagami(data):
+    # Вычисляем выборочное среднее и дисперсию
+    barX = sample_aver_count(data)
+    S2 = sample_disp_count(data)
+    
+    # 1. Находим mu из уравнения для дисперсии
+    mu_hat = solve_mu(S2)
+    
+    # 2. Находим delta из первого уравнения для среднего
+    delta_hat = solve_delta(mu_hat, barX)
+    
+    return mu_hat, delta_hat
+def neg_log_likelihood(params, sample):
+    """
+    Вычисляет отрицательный логарифм правдоподобия для распределения Накагами
+    с параметрами формы (mu) и сдвига (loc), фиксированного масштаба = 1.
+    params: [mu, loc]
+    Возвращает: -ln L(params) 
+    """
+    mu_val, loc_val = params
+
+    n = 300
+    #sum_log = Σ ln(x_i − loc),   sum_sq = Σ (x_i − loc)^2
+    logL = n * (math.log(2) + mu_val * math.log(mu_val) - math.lgamma(mu_val))
+    sum_log = 0.0
+    sum_sq  = 0.0
+    for x in sample:
+        dx = x - loc_val
+        
+        sum_log += math.log(dx)
+        sum_sq  += dx * dx
+    # logL += (2μ − 1)·sum_log  − μ·sum_sq
+    logL += (2 * mu_val - 1) * sum_log - mu_val * sum_sq
+    return -logL
 
 def moda_count(data):
     max_count = 0
@@ -163,7 +149,6 @@ def moment_centr(data, poryadok):
     for x in data:
         sum += (x-sred)**poryadok
     return sum / len(data)
-
 # Функция для вычисления эмпирической функции распределения (ЭФР)
 def empirical_cdf(data):
     sorted_data = sorted(data)
@@ -266,7 +251,6 @@ def theoretical_cdf_nakagami(x, nu, loc):
     x = np.asarray(x)
     cdf = np.where(x < loc, 0, gammainc(nu, nu * (x - loc)**2))
     return cdf
-
 # def plot_theoretical_cdf(nu, loc):
 #     """
 #     Строит график теоретической ФР распределения Накагами с параметрами:
@@ -334,9 +318,6 @@ def plot_three_theoretical_cdfs_on_one(nu1, loc1, nu2, loc2, nu3, loc3):
     plt.xlim(x_min, x_max)
     plt.ylim(-0.05, 1.05)
     plt.show()
-
-
-
 def main():
     with open('var_4_nakagami.csv', newline ='') as f:
         reader = csv.reader(f, delimiter=' ')
@@ -373,7 +354,6 @@ def main():
         print(moment_nach(sample,10), "момент начальный 10")
         print(moment_centr(sample,1), "момент центральный 1")
         print(moment_centr(sample,10), "момент центральный 10")
-
         ecdf_10 = empirical_cdf(rand_sub_sample(sample,10))
         ecdf_100 = empirical_cdf(rand_sub_sample(sample,100))
         ecdf_200 = empirical_cdf(rand_sub_sample(sample,200))
@@ -388,23 +368,27 @@ def main():
         # Данные (например, амплитуда сигнала)
 
         # Оценка параметров
-        nu, loc, scale = nakagami.fit(sample, floc= sorted_sample[0])  # floc=0 фиксирует loc (сдвиг) на 0
+        nu, loc, scale = nakagami.fit(sample, fscale = 1)  # floc=0 фиксирует loc (сдвиг) на 0
         print(f"Оценки: nu = {nu:.2f}, scale = {scale:.2f},loc = {loc:.2f}")
-        
+        # Оценка методом моментов
+        mu_mom, loc_mom = method_of_moments_nakagami(sample)
 
-        mu_mom, omega_mom, delta_mom = method_of_moments_nakagami(sample)
-        print("\nОценки методом моментов:")
-        print(f"mu (форма) = {mu_mom:.5f}")
-        print(f"omega (масштаб) = {omega_mom:.5f}")
-        print(f"delta (сдвиг) = {delta_mom:.5f}")
+        print(f"Метод моментов:\nmû = {mu_mom:.6f}, δ̂ = {loc_mom:.6f}")
+
+        min_x = min(sample)
+        initial = [2, 2]
+        bounds = [(1e-6, None), (None, min_x)]
+        result = minimize(
+            neg_log_likelihood,
+            initial,
+            args=(sample,),
+            method='L-BFGS-B',
+            bounds=bounds
+        )
+        mu_mle, loc_mle = result.x
+        print(f"Метод ММП → mu = {mu_mle:.6f}, loc = {loc_mle:.6f}")
+
         
-        # Инициализация (можно использовать оценки MoM)
-        # Предполагаем, что есть функции mom_estimates, но можно задать вручную:
-        # Здесь mu0 ~ 9.5, delta0 ~ 3.44, найденные ранее методом моментов
-        mu0 = 9.5
-        delta0 = np.min(sample) - 0.01
-        mu_mle, delta_mle, iterations = newton_raphson_nakagami(sample, mu0, delta0)
-        print(f"Оценки (MLE): mu = {mu_mle:.5f}, delta = {delta_mle:.5f}, итераций: {iterations}")
         
 
 if __name__ == '__main__':
