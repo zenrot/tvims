@@ -14,7 +14,84 @@ sample_aver = 0
 
 sample = []
 
+def plot_mom_mle_ecdf(sample):
+    """
+    Строит на одном графике:
+    - Теоретическую функцию распределения с параметрами методом моментов.
+    - Теоретическую функцию распределения с параметрами методом максимального правдоподобия.
+    - Эмпирическую функцию распределения по всей выборке.
+    """
 
+    # 1. Оценки параметров методом моментов
+    mu_mom, loc_mom = method_of_moments_nakagami(sample)
+
+    # 2. Оценки параметров методом максимального правдоподобия
+    sorted_sample = sorted(sample)
+    mu_mle, loc_mle, skale = nakagami.fit(sample, fscale = 1)
+
+    # 3. Эмпирическая функция распределения
+    ecdf_points = empirical_cdf(sample)
+    ecdf_x = [point[0] for point in ecdf_points]
+    ecdf_y = [point[1] for point in ecdf_points]
+
+    # 4. Подготовка оси X
+    x_min = min(sample)
+    x_max = max(sample)
+    x_values = np.linspace(x_min, x_max, 500)
+
+    # 5. Вычисляем значения теоретических ФР
+    cdf_mom = theoretical_cdf_nakagami(x_values, mu_mom, loc_mom)
+    cdf_mle = theoretical_cdf_nakagami(x_values, mu_mle, loc_mle)
+
+    # 6. Построение графика
+    plt.figure(figsize=(10, 6))
+
+    # Теоретическая по методу моментов
+    plt.plot(x_values, cdf_mom, label=f"Метод моментов (μ={mu_mom:.2f}, loc={loc_mom:.2f})", color='red', linewidth=2)
+
+    # Теоретическая по ММП
+    plt.plot(x_values, cdf_mle, label=f"Метод МП (μ={mu_mle:.2f}, loc={loc_mle:.2f})", color='green', linewidth=2)
+
+    # Эмпирическая функция распределения
+    plt.step(ecdf_x, ecdf_y, where='post', label="Эмпирическая ФР", color='blue', linewidth=2)
+
+    plt.xlabel("x")
+    plt.ylabel("F(x)")
+    plt.title("Теоретические и эмпирическая функции распределения")
+    plt.grid(True)
+    plt.legend()
+    plt.xlim(x_min, x_max)
+    plt.ylim(0, 1.05)
+    plt.show()
+
+def bootstrap_bias_mle(data, num_bootstrap_samples=1000):
+    mu_estimates = []
+    scale_estimates = []
+    loc_estimates = []
+
+    n = len(data)
+    for _ in range(num_bootstrap_samples):
+        bootstrap_sample = [random.choice(data) for _ in range(n)]
+        sorted_bootstrap = sorted(bootstrap_sample)
+        mu_hat, loc_hat, scale_hat = nakagami.fit(bootstrap_sample, floc=sorted_bootstrap[0], fscale=1)
+        mu_estimates.append(mu_hat)
+        loc_estimates.append(loc_hat)
+        scale_estimates.append(scale_hat)
+
+    # Средние значения оценок
+    mean_mu = np.mean(mu_estimates)
+    mean_loc = np.mean(loc_estimates)
+
+    # Оригинальные оценки
+    sorted_data = sorted(data)
+    mu_original, loc_original, scale_original = nakagami.fit(data, floc=sorted_data[0], fscale=1)
+
+    # Смещения
+    bias_mu = mean_mu - mu_original
+    bias_loc = mean_loc - loc_original
+
+
+    return bias_mu, bias_loc
 
 def rand_sub_sample(data, size):
     return random.sample(data,size)
@@ -388,6 +465,11 @@ def main():
         mu_mle, loc_mle = result.x
         print(f"Метод ММП → mu = {mu_mle:.6f}, loc = {loc_mle:.6f}")
 
+        bias_mu, bias_loc = bootstrap_bias_mle(sample)
+        print(f"Bias mu: {bias_mu:.5f}")
+        print(f"Bias loc: {bias_loc:.5f}")
+
+        plot_mom_mle_ecdf(sample)
         
         
 
